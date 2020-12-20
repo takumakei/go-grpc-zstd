@@ -1,4 +1,4 @@
-package zstd_test
+package zstd
 
 import (
 	"github.com/takumakei/go-grpc-zstd/zstd"
@@ -7,13 +7,13 @@ import (
 
 func Example() {
 	conn, err := grpc.Dial(
-		"example.com:9000",
-		grpc.WithInsecure(),
+		"localhost:9000",
 		grpc.WithDefaultCallOptions(grpc.UseCompressor(zstd.Name)),
+		grpc.WithInsecure(),
 	)
 	if err != nil {
 		panic(err)
 	}
 	defer conn.Close()
-	// output:
+	// Output:
 }

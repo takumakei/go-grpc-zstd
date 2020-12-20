@@ -6,14 +6,14 @@ import (
 	"io"
 	"sync"
 
+	"github.com/google/wuffs/lib/cgozstd"
 	"github.com/google/wuffs/lib/compression"
-	"github.com/klauspost/compress/zstd"
 	"google.golang.org/grpc/encoding"
 )
 
 const (
 	Name      = "zstd"
-	PoweredBy = "github.com/klauspost/compress/zstd"
+	PoweredBy = "github.com/google/wuffs/lib/cgozstd"
 )
 
 func init() {
@@ -36,56 +36,38 @@ func SetLevel(level compression.Level) {
 }
 
 type writer struct {
-	*zstd.Encoder
+	cgozstd.Writer
 	pool *sync.Pool
 }
 
 func (c *compressor) Compress(w io.Writer) (io.WriteCloser, error) {
 	z := c.poolCompressor.Get().(*writer)
-	if z.Encoder == nil {
-		e, err := zstd.NewWriter(w, zstd.WithEncoderLevel(zstdCompressionLevel(compressionLevel)))
-		if err != nil {
-			c.poolCompressor.Put(z)
-			return nil, err
-		}
-		z.Encoder = e
-	} else {
-		z.Encoder.Reset(w)
-	}
-	return z, nil
+	err := z.Writer.Reset(w, nil, compressionLevel)
+	return z, err
 }
 
 func (z *writer) Close() error {
 	defer z.pool.Put(z)
-	err0 := z.Encoder.Flush()
-	err1 := z.Encoder.Close()
-	if err0 != nil {
-		return err0
-	}
-	return err1
+	return z.Writer.Close()
 }
 
 type reader struct {
-	*zstd.Decoder
+	cgozstd.Reader
 	pool *sync.Pool
 }
 
 func (c *compressor) Decompress(r io.Reader) (io.Reader, error) {
 	z := c.poolDecompressor.Get().(*reader)
-	d, err := zstd.NewReader(r)
-	if err != nil {
+	if err := z.Reset(r, nil); err != nil {
 		c.poolDecompressor.Put(z)
 		return nil, err
 	}
-	z.Decoder = d
 	return z, nil
 }
 
 func (z *reader) Read(p []byte) (n int, err error) {
-	n, err = z.Decoder.Read(p)
+	n, err = z.Reader.Read(p)
 	if err == io.EOF {
-		z.Decoder.Close()
-		z.Decoder = nil
 		z.pool.Put(z)
 	}
 	return n, err
@@ -96,8 +78,4 @@ func (c *compressor) Name() string { return Name }
 type compressor struct {
 	poolCompressor   sync.Pool
 	poolDecompressor sync.Pool
-}
-
-func zstdCompressionLevel(level compression.Level) zstd.EncoderLevel {
-	return zstd.EncoderLevelFromZstd(int(level.Interpolate(1, 2, 3, 15, 22)))
 }

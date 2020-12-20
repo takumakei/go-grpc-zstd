@@ -7,43 +7,45 @@ import (
 	"testing"
 
 	"github.com/google/wuffs/lib/compression"
-	"github.com/takumakei/go-grpc-zstd/pure/zstd"
+	"github.com/takumakei/go-grpc-zstd/zstd"
 	"google.golang.org/grpc/encoding"
 	"google.golang.org/grpc/encoding/gzip"
 )
+
+var BlockSize = 1024 * 1024
 
 // SetLevel update the compression level.
 //
 // NOTE: this function must only be called during initialization time (i.e. in an init() function),
 // and is not thread-safe.
 func SetLevel(level compression.Level) {
-	zstd.SetLevel(compression.LevelDefault)
-	gzip.SetLevel(GzipLevel(compression.LevelDefault))
+	zstd.SetLevel(level)
+	gzip.SetLevel(GzipLevel(level))
 }
 
-func BenchmarkCompress(b *testing.B, size int) {
+func BenchmarkCompress(b *testing.B) {
 	b.Run("zero", func(b *testing.B) {
-		src := make([]byte, size)
+		src := make([]byte, BlockSize)
 		Zero(src)
 		Compress(b, src)
 	})
 
 	b.Run("rand", func(b *testing.B) {
-		src := make([]byte, 1024*1024)
+		src := make([]byte, BlockSize)
 		Rand(src)
 		Compress(b, src)
 	})
 }
 
-func BenchmarkDecompress(b *testing.B, size int) {
+func BenchmarkDecompress(b *testing.B) {
 	b.Run("zero", func(b *testing.B) {
-		src := make([]byte, size)
+		src := make([]byte, BlockSize)
 		Zero(src)
 		Decompress(b, src)
 	})
 
 	b.Run("rand", func(b *testing.B) {
-		src := make([]byte, 1024*1024)
+		src := make([]byte, BlockSize)
 		Rand(src)
 		Decompress(b, src)
 	})
